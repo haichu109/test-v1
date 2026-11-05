@@ -1,0 +1,13 @@
+rules_version = '2';
+
+// Không đăng nhập: ai có cấu hình Firebase (nằm công khai trong web) đều đọc/ghi được.
+// Rules chỉ giới hạn ở đúng 1 document gymlog/main và đúng cấu trúc dữ liệu của GymLog.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /gymlog/main {
+      allow read: if true;
+      allow write: if request.resource.data.keys().hasOnly(['startDate', 'updatedAt', 'days'])
+                   && request.resource.data.days is list;
+    }
+  }
+}

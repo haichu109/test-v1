@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GymLog — Bảng Lịch Sử Tập Gym</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-container">
+    <!-- HEADER -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-icon">🏋️‍♂️</div>
+        <div>
+          <h1>Bảng Lịch Sử Tập Gym</h1>
+          <p class="subtitle">Theo dõi lịch tập, ngày nghỉ & chi tiết thông số từng bài tập</p>
+        </div>
+      </div>
+
+      <div class="start-date-card">
+        <label for="journeyStartDate">📅 Ngày bắt đầu tập:</label>
+        <input type="date" id="journeyStartDate" />
+        <span id="journeyDaysBadge" class="badge-days">Ngày thứ 1</span>
+      </div>
+
+      <div class="header-actions">
+        <button id="btnSaveToDataFolder" class="btn btn-save-main" title="Lưu ngay toàn bộ dữ liệu lên Firestore (Phím tắt: Ctrl + S)">
+          💾 LƯU DỮ LIỆU
+        </button>
+        <button id="btnGenerateRange" class="btn btn-secondary" title="Tạo nhanh các ngày trong tháng đang xem">
+          ⚡ Tạo đủ ngày trong tháng
+        </button>
+        <button id="btnExportCSV" class="btn btn-secondary" title="Xuất ra file Excel / CSV">
+          📥 Xuất CSV
+        </button>
+        <button id="btnBackupJSON" class="btn btn-secondary" title="Tải bản sao lưu JSON rời">
+          ⬇️ Tải bản sao JSON
+        </button>
+        <label class="btn btn-secondary file-label" title="Khôi phục dữ liệu từ file JSON">
+          📂 Nhập JSON
+          <input type="file" id="inputRestoreJSON" accept=".json" hidden />
+        </label>
+      </div>
+      <div id="localFolderBar" class="disk-sync-bar">
+        <span id="localFolderStatusText">☁️ Dữ liệu lưu trên <strong>Firebase Firestore</strong> — Tự động lưu sau mỗi thay đổi</span>
+        <span id="saveStateBadge" class="save-state-badge saved">✅ Đã lưu</span>
+      </div>
+    </header>
+
+    <!-- THỐNG KÊ NHANH -->
+    <section class="stats-grid">
+      <div class="stat-card">
+        <span class="stat-label">Tổng số ngày ghi nhận</span>
+        <strong class="stat-value" id="statTotalDays">0</strong>
+      </div>
+      <div class="stat-card workout">
+        <span class="stat-label">💪 Số ngày tập</span>
+        <strong class="stat-value" id="statWorkoutDays">0</strong>
+      </div>
+      <div class="stat-card rest">
+        <span class="stat-label">🛌 Số ngày nghỉ</span>
+        <strong class="stat-value" id="statRestDays">0</strong>
+      </div>
+      <div class="stat-card volume">
+        <span class="stat-label">🔥 Tổng số bài đã tập</span>
+        <strong class="stat-value" id="statTotalExercises">0</strong>
+      </div>
+    </section>
+
+    <!-- LỊCH THÁNG & BỘ ĐIỀU KHIỂN -->
+    <section class="calendar-section">
+      <div class="section-header">
+        <div class="section-title-group">
+          <h2>🗓️ Lịch Tập Theo Tháng</h2>
+          <span class="hint-text">Nhấn vào một ngày trên lịch để thêm hoặc nhảy tới dòng ghi chép bên dưới</span>
+        </div>
+        <div class="calendar-nav">
+          <button id="btnPrevMonth" class="btn-icon">◀</button>
+          <span id="currentMonthLabel" class="month-label">Tháng 11, 2026</span>
+          <button id="btnNextMonth" class="btn-icon">▶</button>
+          <button id="btnToday" class="btn btn-sm">Hôm nay</button>
+          <button id="btnToggleCalendar" class="btn btn-sm">Thu gọn lịch</button>
+        </div>
+      </div>
+
+      <div id="calendarWrapper" class="calendar-wrapper">
+        <div class="calendar-weekdays">
+          <div>T2</div>
+          <div>T3</div>
+          <div>T4</div>
+          <div>T5</div>
+          <div>T6</div>
+          <div>T7</div>
+          <div>CN</div>
+        </div>
+        <div id="calendarGrid" class="calendar-grid"></div>
+        <div class="calendar-legend">
+          <span class="legend-item"><i class="dot dot-workout"></i> Ngày tập</span>
+          <span class="legend-item"><i class="dot dot-rest"></i> Ngày nghỉ</span>
+          <span class="legend-item"><i class="dot dot-start"></i> Ngày bắt đầu</span>
+          <span class="legend-item"><i class="dot dot-empty"></i> Chưa ghi nhận</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- BẢNG LỊCH SỬ CHI TIẾT (TÁCH RIÊNG TỪNG THÁNG & NĂM) -->
+    <section class="table-section">
+      <!-- Thanh chọn nhanh các Bảng Tháng/Năm đã có dữ liệu -->
+      <div class="month-tabs-bar">
+        <span class="tabs-title">🗂️ Các bảng theo Tháng/Năm:</span>
+        <div id="monthTabsList" class="month-tabs-list"></div>
+      </div>
+
+      <!-- Đầu bảng: Điều hướng Tháng & Năm độc lập từng bảng -->
+      <div class="monthly-table-banner">
+        <div class="monthly-banner-left">
+          <button id="btnTablePrevMonth" class="btn btn-secondary btn-nav-month" title="Xem bảng tháng trước">
+            ◀ Tháng trước
+          </button>
+
+          <div class="active-month-selector">
+            <span class="table-badge-label">📋 BẢNG THÁNG:</span>
+            <select id="selectTableMonth" class="month-select-control">
+              <option value="0">Tháng 01</option>
+              <option value="1">Tháng 02</option>
+              <option value="2">Tháng 03</option>
+              <option value="3">Tháng 04</option>
+              <option value="4">Tháng 05</option>
+              <option value="5">Tháng 06</option>
+              <option value="6">Tháng 07</option>
+              <option value="7">Tháng 08</option>
+              <option value="8">Tháng 09</option>
+              <option value="9">Tháng 10</option>
+              <option value="10">Tháng 11</option>
+              <option value="11">Tháng 12</option>
+            </select>
+            <span class="slash-sep">/</span>
+            <label for="inputTableYear" class="sr-only">Năm</label>
+            <input type="number" id="inputTableYear" class="year-input-control" min="2000" max="2100" value="2026" title="Nhập năm" />
+          </div>
+
+          <button id="btnTableNextMonth" class="btn btn-secondary btn-nav-month" title="Chuyển sang bảng tháng sau">
+            Tháng sau ▶
+          </button>
+        </div>
+
+        <div class="monthly-banner-stats" id="monthlyBannerStats">
+          <!-- Render tự động: Thống kê riêng của tháng đang mở -->
+        </div>
+      </div>
+
+      <div class="table-toolbar">
+        <div class="toolbar-left">
+          <button id="btnAddDay" class="btn btn-primary">+ Thêm Ngày Tập / Nghỉ (Trong tháng này)</button>
+          <button id="btnSaveTableToolbar" class="btn btn-save-main" title="Lưu ngay lên Firestore (Ctrl + S)">
+            💾 Lưu dữ liệu
+          </button>
+          <button id="btnFinishMonthNext" class="btn btn-next-month-action" title="Kết thúc tháng hiện tại và mở bảng tháng tiếp theo">
+            ⏭️ Hết tháng này → Sang tháng sau
+          </button>
+        </div>
+
+        <div class="toolbar-right">
+          <div class="filter-group">
+            <label for="filterStatus">Lọc trong tháng:</label>
+            <select id="filterStatus">
+              <option value="all">Tất cả ngày</option>
+              <option value="workout">Chỉ ngày tập</option>
+              <option value="rest">Chỉ ngày nghỉ</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="sortOrder">Sắp xếp:</label>
+            <select id="sortOrder">
+              <option value="asc">Đầu tháng → Cuối tháng (STT tăng dần)</option>
+              <option value="desc">Cuối tháng → Đầu tháng</option>
+            </select>
+          </div>
+          <div class="search-box">
+            <input type="text" id="searchInput" placeholder="🔍 Tìm bài tập, ngày trong tháng..." />
+          </div>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="gym-table" id="gymTable">
+          <thead>
+            <tr>
+              <th class="col-stt">STT<br><small>(Trong tháng)</small></th>
+              <th class="col-date">Ngày tháng năm<br><small id="thMonthYearHint">(Tháng 11/2026)</small></th>
+              <th class="col-status">Trạng thái<br><small>(Tập / Nghỉ)</small></th>
+              <th class="col-exercise">Bài tập<br><small>(Ghi từng ô)</small></th>
+              <th class="col-weight">Cân nặng tạ<br><small>(kg)</small></th>
+              <th class="col-sets">Số hiệp<br><small>(Sets)</small></th>
+              <th class="col-reps">Số lần / hiệp<br><small>(Reps)</small></th>
+              <th class="col-rest">Nghỉ giữa hiệp<br><small>(giây / phút)</small></th>
+              <th class="col-actions">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody id="gymTableBody">
+            <!-- Được render bởi JS: CHỈ hiển thị các ngày của đúng Tháng & Năm đang chọn -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <!-- MODAL TẠO DÃY NGÀY TRONG THÁNG -->
+  <div id="modalGenerate" class="modal-backdrop hidden">
+    <div class="modal-content">
+      <h3 id="modalGenTitle">⚡ Tạo các ngày trong Tháng</h3>
+      <p>Tự động tạo các dòng ngày liên tiếp <strong>gói gọn trong tháng đang xem</strong> (hết ngày cuối tháng sẽ dừng, không gộp sang tháng sau).</p>
+      <div class="form-row">
+        <label>Từ ngày (trong tháng này):</label>
+        <input type="date" id="genFromDate" />
+      </div>
+      <div class="form-row">
+        <label>Đến hết ngày (tối đa cuối tháng này):</label>
+        <input type="date" id="genToDate" />
+      </div>
+      <div class="form-row">
+        <label>Số ô bài tập mặc định mỗi ngày tập:</label>
+        <input type="number" id="genDefaultRows" value="4" min="1" max="15" />
+      </div>
+      <div class="modal-actions">
+        <button id="btnCancelModal" class="btn btn-secondary">Hủy</button>
+        <button id="btnConfirmGenerate" class="btn btn-primary">Tạo các ngày trong tháng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GỢI Ý NHANH BÀI TẬP -->
+  <datalist id="exerciseSuggestions">
+    <option value="Đẩy ngực ngang (Bench Press)"></option>
+    <option value="Đẩy ngực trên tạ đơn (Incline Dumbbell Press)"></option>
+    <option value="Ép ngực cáp (Cable Fly)"></option>
+    <option value="Gánh tạ đòn (Barbell Squat)"></option>
+    <option value="Đạp đùi (Leg Press)"></option>
+    <option value="Kéo lưng xô rộng (Lat Pulldown)"></option>
+    <option value="Chèo tạ gập người (Barbell Row)"></option>
+    <option value="Nâng tạ đất (Deadlift)"></option>
+    <option value="Đẩy vai qua đầu (Overhead Press)"></option>
+    <option value="Dang tạ đơn vai giữa (Lateral Raise)"></option>
+    <option value="Cuốn tạ tay trước (Bicep Curl)"></option>
+    <option value="Kéo cáp tay sau (Tricep Pushdown)"></option>
+    <option value="Hít xà đơn (Pull-up)"></option>
+    <option value="Gập bụng / Plank"></option>
+  </datalist>
+
+  <!-- Firebase SDK (bản compat, dùng được với script thường) + cấu hình project -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
