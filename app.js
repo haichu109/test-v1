@@ -122,19 +122,16 @@ function markUnsavedChanges(isUnsaved, customMsg = '') {
   hasUnsavedChanges = isUnsaved;
   const badgeEl = document.getElementById('saveStateBadge');
   const btnMain = document.getElementById('btnSaveToDataFolder');
-  const btnToolbar = document.getElementById('btnSaveTableToolbar');
   if (!badgeEl) return;
 
   if (isUnsaved) {
     badgeEl.className = 'save-state-badge unsaved';
     badgeEl.textContent = customMsg || '⚠️ Có thay đổi chưa lưu lên Firestore';
     if (btnMain) btnMain.classList.add('needs-save');
-    if (btnToolbar) btnToolbar.classList.add('needs-save');
   } else {
     badgeEl.className = 'save-state-badge saved';
     badgeEl.textContent = customMsg || `☁️ Đã lưu lên Firestore (${formatTimeHMS()})`;
     if (btnMain) btnMain.classList.remove('needs-save');
-    if (btnToolbar) btnToolbar.classList.remove('needs-save');
   }
 }
 
@@ -1185,7 +1182,6 @@ window.addEventListener('beforeunload', (e) => {
 });
 
 document.getElementById('btnSaveToDataFolder').addEventListener('click', saveToFirestore);
-document.getElementById('btnSaveTableToolbar').addEventListener('click', saveToFirestore);
 
 // Hỗ trợ phím tắt Ctrl + S để lưu nhanh lên Firestore
 window.addEventListener('keydown', (e) => {
