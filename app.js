@@ -62,6 +62,21 @@ function uid() {
   return Math.random().toString(36).substring(2, 10) + Date.now().toString(36).slice(-4);
 }
 
+const WORKOUT_GROUPS = [
+  'Ngực',
+  'Vai',
+  'Lưng',
+  'Chân - Thân dưới',
+  'Thân Trên',
+  'Đẩy',
+  'Kéo'
+];
+
+function getDayWorkoutGroup(day) {
+  if (!day || day.status !== 'workout') return '';
+  return typeof day.workoutGroup === 'string' ? day.workoutGroup : '';
+}
+
 function createEmptyExercises(count = 4) {
   return Array.from({ length: count }, () => ({
     id: uid(),
@@ -353,23 +368,31 @@ function renderCalendar() {
       badge.className = 'cal-status-badge';
       if (record.status === 'workout') {
         const filledCount = (record.exercises || []).filter(e => e.name.trim() !== '').length;
-        badge.textContent = `🏋️ Tập (${filledCount} bài)`;
+        const group = getDayWorkoutGroup(record);
+        badge.textContent = group ? `🏋️ ${group} (${filledCount} bài)` : `🏋️ Tập (${filledCount} bài)`;
       } else {
         badge.textContent = '🛌 Ngày nghỉ';
       }
       bottomRow.appendChild(badge);
 
       if (record.status === 'workout') {
-        const previewNames = (record.exercises || [])
-          .map(e => e.name.trim())
-          .filter(Boolean)
-          .join(', ');
-        if (previewNames) {
-          const preview = document.createElement('div');
-          preview.className = 'cal-exercises-preview';
-          preview.textContent = previewNames;
-          bottomRow.appendChild(preview);
-        }
+        const currentGroup = getDayWorkoutGroup(record);
+        const groupSelect = document.createElement('select');
+        groupSelect.className = 'cal-workout-group-select';
+        groupSelect.title = 'Chọn nhóm bài tập chính của ngày này';
+        groupSelect.innerHTML = `
+          <option value="">-- Chọn ngày tập --</option>
+          ${WORKOUT_GROUPS.map((g, idx) => `<option value="${g}" ${currentGroup === g ? 'selected' : ''}>${idx + 1}. ${g}</option>`).join('')}
+        `;
+        groupSelect.addEventListener('click', (e) => e.stopPropagation());
+        groupSelect.addEventListener('mousedown', (e) => e.stopPropagation());
+        groupSelect.addEventListener('change', (e) => {
+          e.stopPropagation();
+          record.workoutGroup = e.target.value;
+          saveState();
+          renderAll();
+        });
+        bottomRow.appendChild(groupSelect);
       } else if (record.restNote) {
         const preview = document.createElement('div');
         preview.className = 'cal-exercises-preview';
@@ -443,12 +466,13 @@ function renderTable() {
     if (statusFilter !== 'all' && day.status !== statusFilter) return false;
     if (keyword) {
       const dateMatch = day.date.includes(keyword) || formatVNDate(day.date).includes(keyword);
+      const groupMatch = (day.workoutGroup || '').toLowerCase().includes(keyword);
       const restMatch = (day.restNote || '').toLowerCase().includes(keyword);
       const exMatch = (day.exercises || []).some(ex =>
         (ex.name || '').toLowerCase().includes(keyword) ||
         (ex.weight || '').toLowerCase().includes(keyword)
       );
-      return dateMatch || restMatch || exMatch;
+      return dateMatch || groupMatch || restMatch || exMatch;
     }
     return true;
   });
@@ -633,6 +657,21 @@ function createStatusCell(day, rowSpan) {
   td.appendChild(select);
 
   if (day.status === 'workout') {
+    const currentGroup = getDayWorkoutGroup(day);
+    const groupSelect = document.createElement('select');
+    groupSelect.className = 'workout-group-select';
+    groupSelect.title = 'Chọn nhóm bài tập chính trong ngày';
+    groupSelect.innerHTML = `
+      <option value="">-- Chọn ngày tập --</option>
+      ${WORKOUT_GROUPS.map((g, idx) => `<option value="${g}" ${currentGroup === g ? 'selected' : ''}>${idx + 1}. ${g}</option>`).join('')}
+    `;
+    groupSelect.addEventListener('change', (e) => {
+      day.workoutGroup = e.target.value;
+      saveState();
+      renderCalendar();
+    });
+    td.appendChild(groupSelect);
+
     const addExBtn = document.createElement('button');
     addExBtn.className = 'btn-add-exercise-inline';
     addExBtn.textContent = '+ Thêm ô bài tập';
@@ -1012,13 +1051,14 @@ document.getElementById('btnExportCSV').addEventListener('click', () => {
       if (day.status === 'rest') {
         rows.push([stt, vnDate, weekday, 'Ngày nghỉ', '-', day.restNote || 'Nghỉ ngơi', '-', '-', '-', '-']);
       } else {
+        const groupLabel = day.workoutGroup ? `Ngày tập (${day.workoutGroup})` : 'Ngày tập';
         const exList = day.exercises && day.exercises.length ? day.exercises : [{ name: '', weight: '', sets: '', reps: '', restTime: '' }];
         exList.forEach((ex, exIdx) => {
           rows.push([
             exIdx === 0 ? stt : '',
             exIdx === 0 ? vnDate : '',
             exIdx === 0 ? weekday : '',
-            exIdx === 0 ? 'Ngày tập' : '',
+            exIdx === 0 ? groupLabel : '',
             exIdx + 1,
             ex.name || '',
             ex.weight || '',
